@@ -50,4 +50,5 @@ func main() {
 	if err != nil {
 		endWithError(err)
 	}
+	_, _, _ = address, rate, sensorName
 }
