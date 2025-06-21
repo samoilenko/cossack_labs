@@ -1,0 +1,65 @@
+package domain
+
+import (
+	"context"
+	"testing"
+	"time"
+)
+
+type mockSensor struct {
+	value int
+}
+
+func (m *mockSensor) GetValue() int {
+	return m.value
+}
+
+func TestValueReader_Read(t *testing.T) {
+	t.Run("reads values from sensor at a given rate", func(t *testing.T) {
+		sensor := &mockSensor{value: 42}
+		reader, _ := NewValueReader(Rate(10), 2)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond) // +- 5 reads per 500ms
+		defer cancel()
+
+		valueCh := reader.Read(ctx, sensor)
+
+		var receivedValues []int
+		for val := range valueCh {
+			receivedValues = append(receivedValues, val)
+		}
+
+		if len(receivedValues) < 4 {
+			t.Errorf("expected more or equal 4 values, but got %d", len(receivedValues))
+		}
+
+		for _, val := range receivedValues {
+			if val != 42 {
+				t.Errorf("expected value 42, but got %d", val)
+			}
+		}
+	})
+
+	t.Run("stops reading when context is cancelled", func(t *testing.T) {
+		sensor := &mockSensor{value: 42}
+		reader, _ := NewValueReader(Rate(1000), 2)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		valueCh := reader.Read(ctx, sensor)
+		time.Sleep(20 * time.Millisecond)
+
+		cancel()
+
+		timeout := time.After(100 * time.Millisecond)
+		for {
+			select {
+			case _, ok := <-valueCh:
+				if !ok {
+					return
+				}
+			case <-timeout:
+				t.Fatal("timed out waiting for channel to close")
+			}
+		}
+	})
+}
