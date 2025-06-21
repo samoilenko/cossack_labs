@@ -1,4 +1,5 @@
 // Package domain provides core business logic for sensor data processing.
+// A sensor node - application which emits telemetry data
 package domain
 
 import (
@@ -39,9 +40,9 @@ func (v *ValueReader) Read(ctx context.Context, sensor Sensor) <-chan int {
 }
 
 // NewValueReader creates a ValueReader with the given rate and buffer size
-func NewValueReader(rate Rate, maxCapacity uint32) (*ValueReader, error) {
+func NewValueReader(rate Rate, maxCapacity uint32) *ValueReader {
 	return &ValueReader{
 		rate:        rate,
 		maxCapacity: maxCapacity,
-	}, nil
+	}
 }
