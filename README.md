@@ -1,1 +1,4 @@
 # cossack_labs
+
+### Generating code from proto files
+docker run --volume "$(pwd):/workspace" --workdir /workspace bufbuild/buf generate --debug
