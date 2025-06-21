@@ -1,13 +1,3 @@
-package main
-
-import (
-	"flag"
-	"fmt"
-	"os"
-
-	"github.com/samoilenko/cossack_labs/sensor/infrastructure"
-)
-
 /**
  * This component reads data from a sensor and transfers data to a consumer
  *
@@ -18,22 +8,46 @@ import (
  *
  * Usage example: sensor -rate 5 -name TEMP2 -address=http://consumer.com:8080
  */
+package main
+
+import (
+	"flag"
+	"fmt"
+	"os"
+
+	sensorDomain "github.com/samoilenko/cossack_labs/sensor/domain"
+)
+
+func endWithError(err error) {
+	fmt.Fprintf(os.Stderr, "Error: %v\n\n", err)
+	flag.Usage()
+	os.Exit(1)
+}
+
 func main() {
-	sensorName := flag.String("name", "", " sensor name")
-	sinkAddress := flag.String("address", "", " address of the telemetry sink")
-	rate := flag.Int("rate", 0, "number of messages per second to send")
+	rawSensorName := flag.String("name", "", " sensor name")
+	rawSinkAddress := flag.String("address", "", " address of the telemetry sink")
+	rawRate := flag.Int("rate", 0, "number of messages per second to send, greater than 0")
 
 	flag.Parse()
-	if *sensorName == "" || *sinkAddress == "" || *rate == 0 {
+	if *rawSensorName == "" || *rawSinkAddress == "" || *rawRate <= 0 {
 		fmt.Fprintln(os.Stderr, "Error: missing or invalid flags")
 		flag.Usage()
 		os.Exit(1)
 	}
-	_, err := infrastructure.NewConfig(*sensorName, *rate, *sinkAddress)
+
+	address, err := sensorDomain.NewAddress(*rawSinkAddress)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n\n", err)
-		flag.Usage()
-		os.Exit(1)
+		endWithError(err)
 	}
 
+	rate, err := sensorDomain.NewRate(*rawRate)
+	if err != nil {
+		endWithError(err)
+	}
+
+	sensorName, err := sensorDomain.NewSensorName(*rawSensorName)
+	if err != nil {
+		endWithError(err)
+	}
 }
