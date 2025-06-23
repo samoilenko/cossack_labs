@@ -1,5 +1,8 @@
 syntax = "proto3";
 
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
 package sensorpb.v1;
 
 option go_package = "github.com/samoilenko/cossack_labs/pkg/sensorpb/v1;sensorpbv1";
@@ -15,13 +18,15 @@ enum Codes {
 message SensorData {
   string sensor_name = 1;
   int32 sensor_value = 2;
-  uint32 timestamp = 3;
+  google.protobuf.Timestamp timestamp = 3;
+  int64 correlationId = 4;
 }
 
 message Response {
   Codes code = 1;
   string message = 2;
-  uint32 retry_after = 3;
+  google.protobuf.Duration retry_after = 3;
+  int64 correlationId = 4;
 }
 
 service SensorService {
