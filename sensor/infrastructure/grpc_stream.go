@@ -71,7 +71,7 @@ func (s *GrpcStream) EstablishNewConnection(ctx context.Context) (*connect.BidiS
 }
 
 // Get returns instance of GRPC stream
-func (s *GrpcStream) Get() (*connect.BidiStreamForClient[sensorpb.SensorData, sensorpb.Response], error) {
+func (s *GrpcStream) get() (*connect.BidiStreamForClient[sensorpb.SensorData, sensorpb.Response], error) {
 	if !s.IsReady() {
 		return nil, sensorDomain.ErrTransportNotReady
 	}
@@ -100,8 +100,9 @@ func (s *GrpcStream) Close() {
 	}
 }
 
+// Send sends data through the stream.
 func (s *GrpcStream) Send(data *sensorpb.SensorData) error {
-	stream, err := s.Get()
+	stream, err := s.get()
 	if err != nil {
 		return err
 	}

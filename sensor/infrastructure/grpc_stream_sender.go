@@ -21,10 +21,7 @@ type IDGenerator interface {
 // StreamManager defines the contract for managing a bidirectional gRPC stream.
 type StreamManager interface {
 	EstablishNewConnection(ctx context.Context) (*connect.BidiStreamForClient[sensorpb.SensorData, sensorpb.Response], error)
-	Get() (*connect.BidiStreamForClient[sensorpb.SensorData, sensorpb.Response], error)
 	Send(data *sensorpb.SensorData) error
-	IsReady() bool
-	Close()
 }
 
 // GrpcStreamSender manages a bidirectional gRPC stream for sending sensor data with automatic reconnection and rate limiting.
