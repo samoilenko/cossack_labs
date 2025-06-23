@@ -122,4 +122,5 @@ func main() {
 	streamConsumer.Stop()
 
 	wg.Wait()
+	logger.Info("All components stopped gracefully")
 }

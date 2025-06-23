@@ -90,4 +90,5 @@ func main() {
 	logger.Info("sender stopped")
 
 	wg.Wait()
+	logger.Info("All components stopped gracefully")
 }
