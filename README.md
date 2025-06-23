@@ -5,3 +5,6 @@ docker run --volume "$(pwd):/workspace" --workdir /workspace bufbuild/buf genera
 
 ### Linter
 go tool revive ./...
+
+### Test
+go test -race ./...
