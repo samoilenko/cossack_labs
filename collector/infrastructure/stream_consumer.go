@@ -123,7 +123,7 @@ func (s *StreamConsumer) GetStream(ctx context.Context, stream *connect.BidiStre
 				Message: err.Error(),
 			}
 		} else {
-			s.logger.Error(err.Error())
+			s.logger.Error("interceptors return unknown error: %s", err.Error())
 			response = &gen.Response{
 				Code:    gen.Codes_CODE_INTERNAL,
 				Message: "Internal error",
