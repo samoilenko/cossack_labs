@@ -9,17 +9,24 @@ import (
 
 // Sensor is a data source of values
 type Sensor interface {
-	GetValue() int
+	GetValue() (int32, error)
+}
+
+// SensorValue provides data received from a sensor
+type SensorValue struct {
+	Timestamp time.Time
+	Value     int32
 }
 
 // ValueReader reads values from a sensor in a given time period
 type ValueReader struct {
+	logger      Logger
 	maxCapacity uint32
 	rate        Rate
 }
 
-func (v *ValueReader) Read(ctx context.Context, sensor Sensor) <-chan int {
-	valueCH := make(chan int, v.maxCapacity)
+func (v *ValueReader) Read(ctx context.Context, sensor Sensor) <-chan *SensorValue {
+	valueCH := make(chan *SensorValue, v.maxCapacity)
 	delay := time.Second / time.Duration(v.rate)
 	ticker := time.NewTicker(delay)
 
@@ -31,7 +38,15 @@ func (v *ValueReader) Read(ctx context.Context, sensor Sensor) <-chan int {
 				ticker.Stop()
 				return
 			case <-ticker.C:
-				valueCH <- sensor.GetValue()
+				value, err := sensor.GetValue()
+				if err != nil {
+					v.logger.Error("error on getting value: %s", err.Error())
+					continue
+				}
+				valueCH <- &SensorValue{
+					Value:     value,
+					Timestamp: time.Now(),
+				}
 			}
 		}
 	}()
@@ -40,8 +55,9 @@ func (v *ValueReader) Read(ctx context.Context, sensor Sensor) <-chan int {
 }
 
 // NewValueReader creates a ValueReader with the given rate and buffer size
-func NewValueReader(rate Rate, maxCapacity uint32) *ValueReader {
+func NewValueReader(rate Rate, maxCapacity uint32, logger Logger) *ValueReader {
 	return &ValueReader{
+		logger:      logger,
 		rate:        rate,
 		maxCapacity: maxCapacity,
 	}
