@@ -19,8 +19,8 @@ COLLECTOR_FLUSH_INTERVAL=5s
 
 COLLECTOR_LOG_FILE=./data.txt
 
-
-docker composer up --build -d
+**RUN**
+`docker composer up --build -d`
 
 ## Description
 Application implements two behaviors:
