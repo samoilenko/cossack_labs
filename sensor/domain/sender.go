@@ -24,6 +24,7 @@ type SensorDataSender struct {
 // The method blocks until the context is cancelled or the input channel is closed.
 func (s *SensorDataSender) Send(ctx context.Context, values <-chan *SensorValue) {
 	for v := range values {
+		// TODO: add timeout
 		err := s.transport.Send(ctx, v.Value, v.Timestamp, s.sensorName)
 		if err == nil {
 			continue
@@ -36,13 +37,14 @@ func (s *SensorDataSender) Send(ctx context.Context, values <-chan *SensorValue)
 			case <-ctx.Done():
 				return
 			case <-time.After(rateLimitError.Delay):
-
+				s.logger.Info("delay is finished")
 			}
 		} else if errors.Is(err, ErrTransportNotReady) {
 			select {
 			case <-ctx.Done():
 				return
 			case <-time.After(time.Second * 1):
+				s.logger.Info("transport is not ready")
 			}
 		}
 	}
