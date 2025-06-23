@@ -41,30 +41,7 @@ func main() {
 	ctx, finish := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer finish()
 
-	rawBindAddress := flag.String("bind-address", "", "Bind address (e.g. 0.0.0.0:8080)")
-	rawLogPath := flag.String("log-file", "", "Path to output log file")
-	rawBufferSize := flag.Int("buffer-size", 0, "Buffer size in bytes")
-	rawFlushInterval := flag.Duration("flush-interval", 0, "Buffer flush interval in seconds")
-	rawRateLimit := flag.Int("rate-limit", 0, "Rate limit in bytes/sec")
-
-	flag.Parse()
-
-	bindAddress, err := collectorDomain.NewBindAddress(*rawBindAddress)
-	if err != nil {
-		endWithError(err)
-	}
-
-	logPath, err := collectorDomain.NewLogPath(*rawLogPath)
-	if err != nil {
-		endWithError(err)
-	}
-
-	bufferSize, err := collectorDomain.NewBufferSize(*rawBufferSize)
-	if err != nil {
-		endWithError(err)
-	}
-
-	flushInterval, err := collectorDomain.NewFlushInterval(*rawFlushInterval)
+	config, err := collectorInfrastructure.GetFromCommandLineParameters()
 	if err != nil {
 		endWithError(err)
 	}
@@ -72,16 +49,11 @@ func main() {
 	stdlibLogger := log.New(os.Stdout, "", log.LstdFlags)
 	logger := collectorDomain.NewStdLogger(stdlibLogger)
 
-	rateLimit, err := collectorDomain.NewRateLimit(*rawRateLimit)
-	if err != nil {
-		endWithError(err)
-	}
-
 	wg := &sync.WaitGroup{}
 	writer := collectorInfrastructure.NewFileWriter(
-		logPath,
-		bufferSize,
-		flushInterval,
+		config.LogPath,
+		config.BufferSize,
+		config.FlushInterval,
 		logger,
 	)
 	wg.Add(1)
@@ -91,7 +63,7 @@ func main() {
 	}()
 
 	sensorDataValidator := collectorInfrastructure.NewSensorDataValidator()
-	rateLimiter := collectorInfrastructure.NewRateLimiter[*gen.SensorData](rateLimit)
+	rateLimiter := collectorInfrastructure.NewRateLimiter[*gen.SensorData](config.RateLimit)
 	interceptors := collectorDomain.WithInterceptors[gen.SensorData](sensorDataValidator, rateLimiter)
 	streamConsumer := collectorInfrastructure.NewStreamConsumer(interceptors, logger)
 
@@ -114,7 +86,7 @@ func main() {
 	mux.Handle(sensor, sensorHandler)
 
 	server := &http.Server{
-		Addr:        string(bindAddress),
+		Addr:        string(config.BindAddress),
 		Handler:     h2c.NewHandler(mux, &http2.Server{}),
 		BaseContext: func(net.Listener) context.Context { return ctx },
 	}
@@ -129,7 +101,7 @@ func main() {
 		}
 	}()
 
-	logger.Info("Listening on %s\n", bindAddress)
+	logger.Info("Listening on %s\n", config.BindAddress)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Error("listenAndServe error: %s", err.Error())
 		finish()
