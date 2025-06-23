@@ -24,7 +24,10 @@ type SensorDataSender struct {
 // The method blocks until the context is cancelled or the input channel is closed.
 func (s *SensorDataSender) Send(ctx context.Context, values <-chan *SensorValue) {
 	for v := range values {
-		err := s.sendWithTimeout(ctx, v)
+		action := func() error {
+			return s.sendWithTimeout(ctx, v)
+		}
+		err := SafeFunctionRun(action, s.logger)
 		if err == nil {
 			continue
 		}

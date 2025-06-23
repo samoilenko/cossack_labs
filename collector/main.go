@@ -24,6 +24,7 @@ import (
 	"syscall"
 	"time"
 
+	"connectrpc.com/connect"
 	collectorDomain "github.com/samoilenko/cossack_labs/collector/domain"
 	collectorInfrastructure "github.com/samoilenko/cossack_labs/collector/infrastructure"
 	gen "github.com/samoilenko/cossack_labs/pkg/sensorpb/v1"
@@ -66,7 +67,7 @@ func main() {
 		writer.Start(ctx)
 	}()
 
-	// configure interceptors
+	// configure on a message interceptors
 	sensorDataValidator := collectorInfrastructure.NewSensorDataValidator()
 	rateLimiter := collectorInfrastructure.NewRateLimiter[*gen.SensorData](config.RateLimit, 1*time.Second)
 	interceptors := collectorDomain.WithInterceptors[gen.SensorData](sensorDataValidator, rateLimiter)
@@ -87,7 +88,11 @@ func main() {
 		logger.Info("Sensor data collector stopped")
 	}()
 
-	sensor, sensorHandler := sensorConnect.NewSensorServiceHandler(streamConsumer)
+	handlerInterceptors := connect.WithInterceptors(
+		collectorInfrastructure.NewPanicRecoveryInterceptor(logger),
+	)
+
+	sensor, sensorHandler := sensorConnect.NewSensorServiceHandler(streamConsumer, handlerInterceptors)
 	mux := http.NewServeMux()
 	mux.Handle(sensor, sensorHandler)
 
