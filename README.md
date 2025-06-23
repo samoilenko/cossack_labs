@@ -1,6 +1,25 @@
 # cossack_labs
 
 ## TL;DR
+For quick set up, use these env varibales:
+
+SENSOR_COLLECTOR_ADDRESS=http://collector:8081
+
+SENSOR_NAME=Water-bath
+
+SENSOR_RATE=2
+
+COLLECTOR_BIND_ADDRESS=:8081
+
+COLLECTOR_RATE_LIMIT=33
+
+COLLECTOR_BUFFER_SIZE=100
+
+COLLECTOR_FLUSH_INTERVAL=5s
+
+COLLECTOR_LOG_FILE=./data.txt
+
+
 docker composer up --build -d
 
 ## Description
