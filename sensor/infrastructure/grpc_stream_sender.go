@@ -117,7 +117,7 @@ func (s *GrpcStreamSender) streamManager(ctx context.Context) {
 			ctxWithCancel, cancel = context.WithCancel(ctx)
 			s.backgroundJobsGroup.Add(1)
 			go func() {
-				s.backgroundJobsGroup.Done()
+				defer s.backgroundJobsGroup.Done()
 				s.readStreamResponse(ctxWithCancel, newStream)
 			}()
 			s.setReady(true)
