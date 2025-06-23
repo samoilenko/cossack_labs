@@ -1,6 +1,6 @@
 // Collector is a sensor data collection service that receives sensor data.
 //
-// Usage: collector -bind-address=:8081  -rate-limit=33 -buffer-size=100 -flush-interval=1s -log-file=./data.txt
+// Usage: collector -bind-address=:8081 -rate-limit=33 -buffer-size=100 -flush-interval=1s -log-file=./data.txt
 //
 // Required flags:
 //

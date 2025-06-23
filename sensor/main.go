@@ -1,6 +1,6 @@
 // This component reads data from a sensor and transfers data to a consumer
 //
-// Usage example: sensor -rate 5 -name TEMP2 -address=http://consumer.com:8080
+// Usage example: sensor -rate=5 -name=TEMP2 -address=http://consumer.com:8080
 //
 // Required flags:
 //
@@ -24,9 +24,12 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	sensorpb "github.com/samoilenko/cossack_labs/pkg/sensorpb/v1"
 	sensorConnect "github.com/samoilenko/cossack_labs/pkg/sensorpb/v1/sensorpbv1connect"
 	sensorDomain "github.com/samoilenko/cossack_labs/sensor/domain"
 	sensorInfrastructure "github.com/samoilenko/cossack_labs/sensor/infrastructure"
+	responseConsumer "github.com/samoilenko/cossack_labs/sensor/infrastructure/response_consumer"
+
 	"golang.org/x/net/http2"
 )
 
@@ -66,7 +69,26 @@ func main() {
 	)
 
 	streamManager := sensorInfrastructure.NewGrpcStream(client, logger)
-	transport := sensorInfrastructure.NewGrpcStreamSender(streamManager, logger)
+	retryAfterDelay := sensorInfrastructure.NewRetryAfterDelay()
+	transport := sensorInfrastructure.NewGrpcStreamSender(streamManager, logger, retryAfterDelay)
+
+	// set up response consumers
+	responseLogger, responseLoggerDone := responseConsumer.ResponseLogger(logger)
+	RetryDelayConsumer, RetryDelayConsumerDone := responseConsumer.RetryDelayConsumer(ctx, retryAfterDelay)
+	responseConsumers := []chan<- *sensorpb.Response{
+		responseLogger,
+		RetryDelayConsumer,
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		responseConsumer.BroadcastResponses[*sensorpb.Response](transport.GetResponseChannel(), responseConsumers)
+		<-responseLoggerDone
+		<-RetryDelayConsumerDone
+	}()
+	//
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()

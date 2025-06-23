@@ -21,7 +21,7 @@ type IDGenerator interface {
 // StreamManager defines the contract for managing a bidirectional gRPC stream.
 type StreamManager interface {
 	EstablishNewConnection(ctx context.Context) (*connect.BidiStreamForClient[sensorpb.SensorData, sensorpb.Response], error)
-	Send(data *sensorpb.SensorData) error
+	Send(ctx context.Context, data *sensorpb.SensorData) error
 }
 
 // GrpcStreamSender manages a bidirectional gRPC stream for sending sensor data with automatic reconnection and rate limiting.
@@ -31,9 +31,9 @@ type GrpcStreamSender struct {
 	logger              sensorDomain.Logger
 	idGenerator         IDGenerator
 	backgroundJobsGroup sync.WaitGroup
+	responseCh          chan *sensorpb.Response
 	reconnectCh         chan bool
-	retryAfterDelay     *RetryAfterDelay
-	retryAfterDelayCh   chan time.Duration
+	retryAfter          *RetryAfterDelay
 	ready               bool
 }
 
@@ -47,11 +47,6 @@ func (s *GrpcStreamSender) Run(ctx context.Context) {
 	}()
 
 	s.triggerReconnect()
-	s.backgroundJobsGroup.Add(1)
-	go func() {
-		defer s.backgroundJobsGroup.Done()
-		s.retryAfterDelayManager(ctx)
-	}()
 	s.streamConnectionManager(ctx)
 }
 
@@ -70,6 +65,7 @@ func (s *GrpcStreamSender) Stop(ctx context.Context) {
 	case <-done:
 		s.logger.Info("background jobs stopped")
 	}
+	close(s.responseCh)
 }
 
 // streamManager handles stream lifecycle including connection, reconnection with exponential backoff, and response reading.
@@ -144,51 +140,14 @@ func (s *GrpcStreamSender) readStreamResponse(ctx context.Context, stream *conne
 			s.logger.Error("error receiving response: %s", err.Error())
 			return
 		}
-
-		switch resp.Code {
-		case sensorpb.Codes_CODE_RESOURCE_EXHAUSTED:
-			s.logger.Info("message dropped, retry after delay: %s, \t correlationId: %d",
-				resp.RetryAfter.AsDuration(), resp.CorrelationId,
-			)
-			s.triggerRetryAfterDelay(resp.RetryAfter.AsDuration())
-		case sensorpb.Codes_CODE_INVALID_ARGUMENT, sensorpb.Codes_CODE_INTERNAL:
-			s.logger.Error("server responded with error code %s: %s, \t correlationId: %d",
-				resp.Code.String(), resp.Message, resp.CorrelationId,
-			)
-		}
-	}
-}
-
-// triggerRetryAfterDelay signals the retry delay manager to set a new delay period.
-func (s *GrpcStreamSender) triggerRetryAfterDelay(value time.Duration) {
-	select {
-	case s.retryAfterDelayCh <- value:
-	default:
-	}
-}
-
-// retryAfterDelayManager manages rate limiting delays by setting and resetting retry periods.
-func (s *GrpcStreamSender) retryAfterDelayManager(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case value := <-s.retryAfterDelayCh:
-			s.retryAfterDelay.Set(value) // TODO: it should be calculated as value + now
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(value):
-				s.retryAfterDelay.Reset()
-			}
-		}
+		s.responseCh <- resp
 	}
 }
 
 // Send transmits sensor data through the gRPC stream, handling rate limiting and connection readiness.
 // Returns a RateLimitError if rate limited, or ErrTransportNotReady if the stream is not ready.
-func (s *GrpcStreamSender) Send(_ context.Context, value int32, timestamp time.Time, sensorName sensorDomain.SensorName) error {
-	delayBetweenSends := s.retryAfterDelay.Get()
+func (s *GrpcStreamSender) Send(ctx context.Context, value int32, timestamp time.Time, sensorName sensorDomain.SensorName) error {
+	delayBetweenSends := s.retryAfter.Get()
 	if delayBetweenSends > 0 {
 		return &sensorDomain.RateLimitError{
 			Message: "rate limit exceeded",
@@ -203,7 +162,7 @@ func (s *GrpcStreamSender) Send(_ context.Context, value int32, timestamp time.T
 		CorrelationId: s.idGenerator.Generate(),
 	}
 	s.logger.Info("sending message: %v", sensorData)
-	err := s.streamManager.Send(sensorData)
+	err := s.streamManager.Send(ctx, sensorData)
 	if err != nil {
 		s.logger.Error("error sending message: %s, \t correlationId: %d",
 			err.Error(), sensorData.CorrelationId,
@@ -224,18 +183,23 @@ func (s *GrpcStreamSender) triggerReconnect() {
 	}
 }
 
+func (s *GrpcStreamSender) GetResponseChannel() <-chan *sensorpb.Response {
+	return s.responseCh
+}
+
 // NewGrpcStreamSender creates a new GrpcStreamSender with the specified client and logger.
 func NewGrpcStreamSender(
 	streamManager StreamManager,
 	logger sensorDomain.Logger,
+	retryAfter *RetryAfterDelay,
 ) *GrpcStreamSender {
 	sender := &GrpcStreamSender{
-		logger:            logger,
-		streamManager:     streamManager,
-		reconnectCh:       make(chan bool, 1),
-		retryAfterDelayCh: make(chan time.Duration, 1),
-		retryAfterDelay:   NewRetryAfterDelay(),
-		idGenerator:       &AtomicIDGenerator{},
+		logger:        logger,
+		streamManager: streamManager,
+		reconnectCh:   make(chan bool, 1),
+		retryAfter:    retryAfter,
+		idGenerator:   &AtomicIDGenerator{},
+		responseCh:    make(chan *sensorpb.Response, 10),
 	}
 	return sender
 }
