@@ -96,14 +96,6 @@ func main() {
 		logger.Info("transport stopped")
 	}()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		<-ctx.Done()
-		streamManager.Close()
-		logger.Info("stream closed")
-	}()
-
 	interval := time.Second / time.Duration(rate)
 	reader := sensorDomain.NewValueReader(interval, 2, logger)
 	valuesCh := reader.Read(ctx, sensorInfrastructure.DummySensor{})

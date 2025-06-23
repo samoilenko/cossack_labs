@@ -45,7 +45,6 @@ func (s *GrpcStream) EstablishNewConnection(ctx context.Context) (*connect.BidiS
 
 		s.logger.Info("getting new stream...")
 		s.setReady(false)
-		s.Close()
 
 		if delay > maxDelay {
 			delay = maxDelay
@@ -88,18 +87,6 @@ func (s *GrpcStream) IsReady() bool {
 	return s.ready
 }
 
-// Close closes the current stream.
-func (s *GrpcStream) Close() {
-	s.setReady(false)
-	s.streamLock.Lock()
-	defer s.streamLock.Unlock()
-	if s.stream != nil {
-		if err := s.stream.CloseRequest(); err != nil {
-			s.logger.Error("got an error on closing stream: %s", err.Error())
-		}
-	}
-}
-
 // Send sends data through the stream.
 func (s *GrpcStream) Send(ctx context.Context, data *sensorpb.SensorData) error {
 	stream, err := s.get()
@@ -114,6 +101,7 @@ func (s *GrpcStream) Send(ctx context.Context, data *sensorpb.SensorData) error 
 
 	select {
 	case <-ctx.Done():
+		stream.CloseRequest()
 		return ctx.Err()
 	case sendErr := <-done:
 		return sendErr
