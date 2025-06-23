@@ -22,6 +22,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	collectorDomain "github.com/samoilenko/cossack_labs/collector/domain"
 	collectorInfrastructure "github.com/samoilenko/cossack_labs/collector/infrastructure"
@@ -67,7 +68,7 @@ func main() {
 
 	// configure interceptors
 	sensorDataValidator := collectorInfrastructure.NewSensorDataValidator()
-	rateLimiter := collectorInfrastructure.NewRateLimiter[*gen.SensorData](config.RateLimit)
+	rateLimiter := collectorInfrastructure.NewRateLimiter[*gen.SensorData](config.RateLimit, 1*time.Second)
 	interceptors := collectorDomain.WithInterceptors[gen.SensorData](sensorDataValidator, rateLimiter)
 
 	streamConsumer := collectorInfrastructure.NewStreamConsumer(interceptors, logger)

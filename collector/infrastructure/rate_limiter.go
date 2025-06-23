@@ -11,10 +11,11 @@ import (
 // RateLimiter implements a fixed window rate limiter for protobuf messages.
 // It limits the total size of messages processed within a 1-second window.
 type RateLimiter[K proto.Message] struct {
-	last     time.Time
-	mu       sync.Mutex
-	maxLimit collectorDomain.RateLimit
-	limit    int
+	last       time.Time
+	mu         sync.Mutex
+	timeWindow time.Duration
+	maxLimit   collectorDomain.RateLimit
+	limit      int
 }
 
 // Apply processes a message through the rate limiter, checking if it exceeds the configured rate limit.
@@ -29,7 +30,7 @@ func (r *RateLimiter[K]) Apply(msg K) error {
 	now := time.Now()
 	elapsed := now.Sub(r.last)
 	size := proto.Size(msg)
-	if elapsed >= time.Second*1 {
+	if elapsed >= r.timeWindow {
 		r.last = now
 		r.limit = size
 
@@ -48,8 +49,9 @@ func (r *RateLimiter[K]) Apply(msg K) error {
 }
 
 // NewRateLimiter creates a new rate limiter instance with the specified maximum limit.
-func NewRateLimiter[K proto.Message](maxLimit collectorDomain.RateLimit) *RateLimiter[K] {
+func NewRateLimiter[K proto.Message](maxLimit collectorDomain.RateLimit, timeWindow time.Duration) *RateLimiter[K] {
 	return &RateLimiter[K]{
-		maxLimit: maxLimit,
+		maxLimit:   maxLimit,
+		timeWindow: timeWindow,
 	}
 }
