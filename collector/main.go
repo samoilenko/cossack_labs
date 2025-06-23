@@ -46,6 +46,7 @@ func main() {
 		endWithError(err)
 	}
 
+	// create instances
 	stdlibLogger := log.New(os.Stdout, "", log.LstdFlags)
 	logger := collectorDomain.NewStdLogger(stdlibLogger)
 
@@ -56,15 +57,18 @@ func main() {
 		config.FlushInterval,
 		logger,
 	)
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		writer.Start(ctx)
 	}()
 
+	// configure interceptors
 	sensorDataValidator := collectorInfrastructure.NewSensorDataValidator()
 	rateLimiter := collectorInfrastructure.NewRateLimiter[*gen.SensorData](config.RateLimit)
 	interceptors := collectorDomain.WithInterceptors[gen.SensorData](sensorDataValidator, rateLimiter)
+
 	streamConsumer := collectorInfrastructure.NewStreamConsumer(interceptors, logger)
 
 	sensorDataCollector := collectorDomain.NewSensorDataCollector(logger, writer)
