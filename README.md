@@ -1,12 +1,28 @@
 # cossack_labs
 
-### TL;DR
+## TL;DR
 docker composer up --build -d
 
 ## Description
 Application implements two behaviors:
  - sensor emulator
  - data collector from a sensor
+   
+
+### Code structure
+ - /collector - code related to the telemetry sink component
+ - /sensor - code related to the sensor component
+ - /proto - proto file descibed contract between sensor component and collector component
+ - /pkg - generated code from the proto file
+ - docker-compose.yml and /docker - docker files to run the project
+ - .env.example - allowed ENV variables
+ - buf.gen.yaml and buf.yaml - Buf configs
+ - go.mod go.sum - the project dependencies
+
+### Tools 
+ - Linter is added as a tool, and can be run `go tool revive ./...`
+ - Tests `go test -race ./...`
+ - generating code from proto files `docker run --volume "$(pwd):/workspace" --workdir /workspace bufbuild/buf generate --debug`
 
 ### Sensor emulator
 It worsk in the following way: read data from sensor, tries to send data to the collector. If delivery is unsuccessfull than the message is dropped.
@@ -33,15 +49,6 @@ This component has several service
    
 5) sensor data transport. It delivers messages to the collector, logs errors received from the collector. If errors occured during sending they will converted to domain errors and passed to the sender layer. Implementation `sensor/infrastructure/grpc_stream_sender.go`
 6) Usage example: sensor -rate 5 -name TEMP2 -address=http://consumer.com:8080
-
-### Generating code from proto files
-docker run --volume "$(pwd):/workspace" --workdir /workspace bufbuild/buf generate --debug
-
-### Linter
-go tool revive ./...
-
-### Test
-go test -race ./...
 
 ### Room for improvements
 - [ ] Add error channel
