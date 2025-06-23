@@ -101,12 +101,23 @@ func (s *GrpcStream) Close() {
 }
 
 // Send sends data through the stream.
-func (s *GrpcStream) Send(data *sensorpb.SensorData) error {
+func (s *GrpcStream) Send(ctx context.Context, data *sensorpb.SensorData) error {
 	stream, err := s.get()
 	if err != nil {
 		return err
 	}
-	return stream.Send(data)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- stream.Send(data)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case sendErr := <-done:
+		return sendErr
+	}
 }
 
 // setReady updates the ready state of the stream sender.
