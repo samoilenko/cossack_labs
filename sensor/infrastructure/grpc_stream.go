@@ -2,7 +2,6 @@ package infrastructure
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 
@@ -44,7 +43,7 @@ func (s *GrpcStream) EstablishNewConnection(ctx context.Context) (*connect.BidiS
 		default:
 		}
 
-		s.logger.Info("reconnecting stream...")
+		s.logger.Info("getting new stream...")
 		s.setReady(false)
 		s.Close()
 
@@ -63,14 +62,7 @@ func (s *GrpcStream) EstablishNewConnection(ctx context.Context) (*connect.BidiS
 			}
 			return nil, err
 		}
-		_, err = newStream.Conn()
-		if err != nil {
-			s.logger.Error("got connection error on getting stream: %s", err.Error())
-			if s.handleBackoff(ctx, &delay) {
-				continue
-			}
-			return nil, err
-		}
+
 		s.setStream(newStream)
 		s.setReady(true)
 
@@ -81,7 +73,7 @@ func (s *GrpcStream) EstablishNewConnection(ctx context.Context) (*connect.BidiS
 // Get returns instance of GRPC stream
 func (s *GrpcStream) Get() (*connect.BidiStreamForClient[sensorpb.SensorData, sensorpb.Response], error) {
 	if !s.IsReady() {
-		return nil, errors.New("stream is not ready")
+		return nil, sensorDomain.ErrTransportNotReady
 	}
 
 	s.streamLock.RLock()
@@ -98,6 +90,7 @@ func (s *GrpcStream) IsReady() bool {
 
 // Close closes the current stream.
 func (s *GrpcStream) Close() {
+	s.setReady(false)
 	s.streamLock.Lock()
 	defer s.streamLock.Unlock()
 	if s.stream != nil {
@@ -105,6 +98,14 @@ func (s *GrpcStream) Close() {
 			s.logger.Error("got an error on closing stream: %s", err.Error())
 		}
 	}
+}
+
+func (s *GrpcStream) Send(data *sensorpb.SensorData) error {
+	stream, err := s.Get()
+	if err != nil {
+		return err
+	}
+	return stream.Send(data)
 }
 
 // setReady updates the ready state of the stream sender.
