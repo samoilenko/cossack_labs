@@ -2,7 +2,6 @@ package infrastructure
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -23,6 +22,7 @@ type IDGenerator interface {
 type StreamManager interface {
 	EstablishNewConnection(ctx context.Context) (*connect.BidiStreamForClient[sensorpb.SensorData, sensorpb.Response], error)
 	Get() (*connect.BidiStreamForClient[sensorpb.SensorData, sensorpb.Response], error)
+	Send(data *sensorpb.SensorData) error
 	IsReady() bool
 	Close()
 }
@@ -60,7 +60,7 @@ func (s *GrpcStreamSender) Run(ctx context.Context) {
 
 // Stop gracefully shuts down the stream sender and waits for background jobs to complete.
 func (s *GrpcStreamSender) Stop(ctx context.Context) {
-	s.logger.Info("Closing stream...")
+	s.logger.Info("Closing stream sender...")
 	done := make(chan struct{})
 	go func() {
 		s.backgroundJobsGroup.Wait()
@@ -80,7 +80,6 @@ func (s *GrpcStreamSender) streamConnectionManager(ctx context.Context) {
 	delay := time.Second * 1
 	maxDelay := time.Second * 10
 
-	var ctxWithCancel context.Context
 	var cancel context.CancelFunc
 
 	for {
@@ -100,9 +99,13 @@ func (s *GrpcStreamSender) streamConnectionManager(ctx context.Context) {
 
 			newStream, err := s.streamManager.EstablishNewConnection(ctx)
 			if err != nil {
-				s.logger.Error(err.Error())
+				s.logger.Error("error on establishing new stream: %s", err.Error())
 				select {
 				case <-ctx.Done():
+					if cancel != nil {
+						cancel()
+					}
+
 					return
 				case <-time.After(delay):
 					if delay > maxDelay {
@@ -115,15 +118,16 @@ func (s *GrpcStreamSender) streamConnectionManager(ctx context.Context) {
 				}
 			}
 
+			delay = time.Second * 1
+
 			// on each new stream add stream reader
 			// and close old reader on creating new stream
-			ctxWithCancel, cancel = context.WithCancel(ctx)
+			streamCtx, newCancel := context.WithCancel(ctx)
+			cancel = newCancel
 			s.backgroundJobsGroup.Add(1)
 			go func() {
-				defer func() {
-					s.backgroundJobsGroup.Done()
-				}()
-				s.readStreamResponse(ctxWithCancel, newStream)
+				defer s.backgroundJobsGroup.Done()
+				s.readStreamResponse(streamCtx, newStream)
 			}()
 		}
 	}
@@ -195,18 +199,6 @@ func (s *GrpcStreamSender) Send(_ context.Context, value int32, timestamp time.T
 		}
 	}
 
-	if !s.streamManager.IsReady() {
-		s.logger.Info("Stream not ready")
-		return sensorDomain.ErrTransportNotReady
-	}
-
-	stream, err := s.streamManager.Get()
-	if err != nil {
-		s.logger.Error("error occurred on getting stream: %s", err.Error())
-		s.triggerReconnect()
-		return sensorDomain.ErrTransportNotReady
-	}
-
 	sensorData := &sensorpb.SensorData{
 		SensorValue:   value,
 		Timestamp:     timestamppb.New(timestamp),
@@ -214,14 +206,14 @@ func (s *GrpcStreamSender) Send(_ context.Context, value int32, timestamp time.T
 		CorrelationId: s.idGenerator.Generate(),
 	}
 	s.logger.Info("sending message: %v", sensorData)
-	err = stream.Send(sensorData)
+	err := s.streamManager.Send(sensorData)
 	if err != nil {
 		s.logger.Error("error sending message: %s, \t correlationId: %d",
 			err.Error(), sensorData.CorrelationId,
 		)
 		s.triggerReconnect()
 
-		return fmt.Errorf("error sending message: %w", err)
+		return sensorDomain.ErrTransportNotReady
 	}
 
 	return nil
