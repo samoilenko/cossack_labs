@@ -64,11 +64,21 @@ func main() {
 		connect.WithGRPC(),
 	)
 
-	transport := sensorInfrastructure.NewGrpcStreamSender(client, logger)
+	streamManager := sensorInfrastructure.NewGrpcStream(client, logger)
+	transport := sensorInfrastructure.NewGrpcStreamSender(streamManager, logger)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		transport.Run(ctx)
+		logger.Info("transport stopped")
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		<-ctx.Done()
+		streamManager.Close()
+		logger.Info("stream closed")
 	}()
 
 	reader := sensorDomain.NewValueReader(rate, 2, logger)
@@ -77,6 +87,7 @@ func main() {
 
 	// Starts read data from a sensor and sends to a consumer
 	sender.Send(ctx, valuesCh)
+	logger.Info("sender stopped")
 
 	wg.Wait()
 }

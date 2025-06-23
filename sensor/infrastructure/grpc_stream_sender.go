@@ -10,7 +10,6 @@ import (
 
 	"connectrpc.com/connect"
 	sensorpb "github.com/samoilenko/cossack_labs/pkg/sensorpb/v1"
-	sensorConnect "github.com/samoilenko/cossack_labs/pkg/sensorpb/v1/sensorpbv1connect"
 	sensorDomain "github.com/samoilenko/cossack_labs/sensor/domain"
 )
 
@@ -20,15 +19,21 @@ type IDGenerator interface {
 	Generate() int64
 }
 
+// StreamManager defines the contract for managing a bidirectional gRPC stream.
+type StreamManager interface {
+	EstablishNewConnection(ctx context.Context) (*connect.BidiStreamForClient[sensorpb.SensorData, sensorpb.Response], error)
+	Get() (*connect.BidiStreamForClient[sensorpb.SensorData, sensorpb.Response], error)
+	IsReady() bool
+	Close()
+}
+
 // GrpcStreamSender manages a bidirectional gRPC stream for sending sensor data with automatic reconnection and rate limiting.
 type GrpcStreamSender struct {
 	streamLock          sync.RWMutex
-	client              sensorConnect.SensorServiceClient
+	streamManager       StreamManager
 	logger              sensorDomain.Logger
 	idGenerator         IDGenerator
 	backgroundJobsGroup sync.WaitGroup
-	stream              *connect.BidiStreamForClient[sensorpb.SensorData, sensorpb.Response]
-	readyLock           sync.Mutex
 	reconnectCh         chan bool
 	retryAfterDelay     *RetryAfterDelay
 	retryAfterDelayCh   chan time.Duration
@@ -39,7 +44,7 @@ type GrpcStreamSender struct {
 // It handles automatic reconnection and rate limiting through background goroutines.
 func (s *GrpcStreamSender) Run(ctx context.Context) {
 	defer func() {
-		withCancel, cancel := context.WithTimeout(context.Background(), time.Second*2)
+		withCancel, cancel := context.WithTimeout(context.Background(), time.Second*3)
 		defer cancel()
 		s.Stop(withCancel)
 	}()
@@ -50,8 +55,7 @@ func (s *GrpcStreamSender) Run(ctx context.Context) {
 		defer s.backgroundJobsGroup.Done()
 		s.retryAfterDelayManager(ctx)
 	}()
-
-	s.streamManager(ctx)
+	s.streamConnectionManager(ctx)
 }
 
 // Stop gracefully shuts down the stream sender and waits for background jobs to complete.
@@ -65,14 +69,14 @@ func (s *GrpcStreamSender) Stop(ctx context.Context) {
 
 	select {
 	case <-ctx.Done():
-		s.logger.Error("background jobs was not stopped in time")
+		s.logger.Error("background jobs were not stopped in time")
 	case <-done:
 		s.logger.Info("background jobs stopped")
 	}
 }
 
 // streamManager handles stream lifecycle including connection, reconnection with exponential backoff, and response reading.
-func (s *GrpcStreamSender) streamManager(ctx context.Context) {
+func (s *GrpcStreamSender) streamConnectionManager(ctx context.Context) {
 	delay := time.Second * 1
 	maxDelay := time.Second * 10
 
@@ -93,11 +97,8 @@ func (s *GrpcStreamSender) streamManager(ctx context.Context) {
 			}
 
 			s.logger.Info("reconnecting stream...")
-			s.setReady(false)
-			s.closeStream()
 
-			newStream := s.client.GetStream(ctx)
-			_, err := newStream.Conn()
+			newStream, err := s.streamManager.EstablishNewConnection(ctx)
 			if err != nil {
 				s.logger.Error(err.Error())
 				select {
@@ -113,14 +114,17 @@ func (s *GrpcStreamSender) streamManager(ctx context.Context) {
 					continue
 				}
 			}
-			s.setStream(newStream)
+
+			// on each new stream add stream reader
+			// and close old reader on creating new stream
 			ctxWithCancel, cancel = context.WithCancel(ctx)
 			s.backgroundJobsGroup.Add(1)
 			go func() {
-				defer s.backgroundJobsGroup.Done()
+				defer func() {
+					s.backgroundJobsGroup.Done()
+				}()
 				s.readStreamResponse(ctxWithCancel, newStream)
 			}()
-			s.setReady(true)
 		}
 	}
 }
@@ -180,20 +184,6 @@ func (s *GrpcStreamSender) retryAfterDelayManager(ctx context.Context) {
 	}
 }
 
-// setReady updates the ready state of the stream sender.
-func (s *GrpcStreamSender) setReady(value bool) {
-	s.readyLock.Lock()
-	defer s.readyLock.Unlock()
-	s.ready = value
-}
-
-// isReady returns the current ready state of the stream sender.
-func (s *GrpcStreamSender) isReady() bool {
-	s.readyLock.Lock()
-	defer s.readyLock.Unlock()
-	return s.ready
-}
-
 // Send transmits sensor data through the gRPC stream, handling rate limiting and connection readiness.
 // Returns a RateLimitError if rate limited, or ErrTransportNotReady if the stream is not ready.
 func (s *GrpcStreamSender) Send(_ context.Context, value int32, timestamp time.Time, sensorName sensorDomain.SensorName) error {
@@ -205,14 +195,14 @@ func (s *GrpcStreamSender) Send(_ context.Context, value int32, timestamp time.T
 		}
 	}
 
-	if !s.isReady() {
+	if !s.streamManager.IsReady() {
 		s.logger.Info("Stream not ready")
 		return sensorDomain.ErrTransportNotReady
 	}
 
-	stream := s.getStream()
-	if stream == nil {
-		s.logger.Error("stream is nil, triggering reconnect")
+	stream, err := s.streamManager.Get()
+	if err != nil {
+		s.logger.Error("error occurred on getting stream: %s", err.Error())
 		s.triggerReconnect()
 		return sensorDomain.ErrTransportNotReady
 	}
@@ -224,7 +214,7 @@ func (s *GrpcStreamSender) Send(_ context.Context, value int32, timestamp time.T
 		CorrelationId: s.idGenerator.Generate(),
 	}
 	s.logger.Info("sending message: %v", sensorData)
-	err := stream.Send(sensorData)
+	err = stream.Send(sensorData)
 	if err != nil {
 		s.logger.Error("error sending message: %s, \t correlationId: %d",
 			err.Error(), sensorData.CorrelationId,
@@ -245,35 +235,14 @@ func (s *GrpcStreamSender) triggerReconnect() {
 	}
 }
 
-// getStream return instance of GRPC stream
-func (s *GrpcStreamSender) getStream() *connect.BidiStreamForClient[sensorpb.SensorData, sensorpb.Response] {
-	s.streamLock.RLock()
-	defer s.streamLock.RUnlock()
-	return s.stream
-}
-
-// setStream updates the current stream.
-func (s *GrpcStreamSender) setStream(stream *connect.BidiStreamForClient[sensorpb.SensorData, sensorpb.Response]) {
-	s.streamLock.Lock()
-	defer s.streamLock.Unlock()
-	s.stream = stream
-}
-
-// closeStream closes the current stream and sets it to nil.
-func (s *GrpcStreamSender) closeStream() {
-	s.streamLock.Lock()
-	defer s.streamLock.Unlock()
-	if s.stream != nil {
-		_ = s.stream.CloseRequest()
-		s.stream = nil
-	}
-}
-
 // NewGrpcStreamSender creates a new GrpcStreamSender with the specified client and logger.
-func NewGrpcStreamSender(client sensorConnect.SensorServiceClient, logger sensorDomain.Logger) *GrpcStreamSender {
+func NewGrpcStreamSender(
+	streamManager StreamManager,
+	logger sensorDomain.Logger,
+) *GrpcStreamSender {
 	sender := &GrpcStreamSender{
 		logger:            logger,
-		client:            client,
+		streamManager:     streamManager,
 		reconnectCh:       make(chan bool, 1),
 		retryAfterDelayCh: make(chan time.Duration, 1),
 		retryAfterDelay:   NewRetryAfterDelay(),
