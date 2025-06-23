@@ -17,7 +17,7 @@ func (r SensorDataValidator) Apply(msg *gen.SensorData) error {
 	if msg.SensorName == "" {
 		return collectorDomain.ErrValidation
 	}
-	if len(msg.SensorName) > 10 {
+	if len([]rune(msg.SensorName)) > 10 {
 		return fmt.Errorf("%w: sensor name is too long: %d chars", collectorDomain.ErrValidation, len(msg.SensorName))
 	}
 
