@@ -1,4 +1,4 @@
-package response_consumer
+package responseconsumer
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 	sensorInfrastructure "github.com/samoilenko/cossack_labs/sensor/infrastructure"
 )
 
+// RetryDelayConsumer creates a response consumer that manages retry delay periods
+// based on server resource exhaustion responses.
 func RetryDelayConsumer(
 	ctx context.Context,
 	retryAfterDelay *sensorInfrastructure.RetryAfterDelay,
@@ -38,7 +40,7 @@ func RetryDelayConsumer(
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					retryAfterDelayManager(ctx, retryAfterDelay, duration)
+					resetDelayAfterDuration(ctx, retryAfterDelay, duration)
 				}()
 			}
 		}
@@ -49,8 +51,7 @@ func RetryDelayConsumer(
 	return respCh, done
 }
 
-// retryAfterDelayManager manages rate limiting delays by setting and resetting retry periods.
-func retryAfterDelayManager(
+func resetDelayAfterDuration(
 	ctx context.Context,
 	retryAfterDelay *sensorInfrastructure.RetryAfterDelay,
 	duration time.Duration,

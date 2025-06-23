@@ -1,10 +1,12 @@
-package response_consumer
+package responseconsumer
 
 import (
 	sensorpb "github.com/samoilenko/cossack_labs/pkg/sensorpb/v1"
 	sensorDomain "github.com/samoilenko/cossack_labs/sensor/domain"
 )
 
+// ResponseLogger creates a response logging consumer that processes collector responses
+// and logs them based on their status codes.
 func ResponseLogger(logger sensorDomain.Logger) (chan<- *sensorpb.Response, <-chan struct{}) {
 	dataCh := make(chan *sensorpb.Response, 10)
 	done := make(chan struct{})

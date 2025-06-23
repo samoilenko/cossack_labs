@@ -183,6 +183,7 @@ func (s *GrpcStreamSender) triggerReconnect() {
 	}
 }
 
+// GetResponseChannel returns a receive-only channel for consuming server responses.
 func (s *GrpcStreamSender) GetResponseChannel() <-chan *sensorpb.Response {
 	return s.responseCh
 }
