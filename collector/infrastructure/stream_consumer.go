@@ -90,7 +90,7 @@ func (s *StreamConsumer) GetStream(ctx context.Context, stream *connect.BidiStre
 		if err != nil {
 			if err == io.EOF {
 				s.logger.Info("Client closed stream")
-				return nil // Client closed stream
+				return nil
 			}
 			return err
 		}
