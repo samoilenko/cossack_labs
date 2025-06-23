@@ -53,6 +53,7 @@ func (fw *FileWriter) Reconnect(ctx context.Context) error {
 
 // flush forces all buffered data to be written to the underlying file.
 func (fw *FileWriter) flush() error {
+	fw.logger.Info("flushing buffer")
 	fw.wLock.Lock()
 	defer fw.wLock.Unlock()
 	return fw.w.Flush()

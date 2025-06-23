@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -15,7 +16,7 @@ type RateLimitError struct {
 
 // Error implements the error interface, returning the error message.
 func (e *RateLimitError) Error() string {
-	return e.Message
+	return fmt.Sprintf("%s \t delay: %s", e.Message, e.Delay)
 }
 
 // ErrValidation is a sentinel error used to indicate validation failures.

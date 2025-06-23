@@ -90,6 +90,7 @@ func (fc *SensorDataCollector) Consume(ctx context.Context, dataChannel <-chan *
 		)
 		logLine := buf.Bytes()
 
+		fc.logger.Info("adding data to writer")
 		if err := fc.writer.Write(logLine); err != nil {
 			fc.logger.Error("error occurred on adding data to writer: %s", err.Error())
 

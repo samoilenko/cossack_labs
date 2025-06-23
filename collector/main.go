@@ -46,10 +46,11 @@ func main() {
 		endWithError(err)
 	}
 
-	// create instances
+	// create instances)
 	stdlibLogger := log.New(os.Stdout, "", log.LstdFlags)
 	logger := collectorDomain.NewStdLogger(stdlibLogger)
 
+	logger.Info("Creating services...")
 	wg := &sync.WaitGroup{}
 	writer := collectorInfrastructure.NewFileWriter(
 		config.LogPath,

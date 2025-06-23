@@ -9,6 +9,7 @@ package infrastructure
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 
@@ -88,11 +89,13 @@ func (s *StreamConsumer) GetStream(ctx context.Context, stream *connect.BidiStre
 		msg, err := stream.Receive()
 		if err != nil {
 			if err == io.EOF {
+				s.logger.Info("Client closed stream")
 				return nil // Client closed stream
 			}
 			return err
 		}
 		if err = s.interceptors.Apply(msg); err == nil {
+			s.logger.Info("passing data to consumer. \t correlation Id: %d", msg.CorrelationId)
 			sensorData := &collectorDomain.SensorData{
 				SensorName: msg.SensorName,
 				Value:      int(msg.SensorValue),
@@ -105,6 +108,7 @@ func (s *StreamConsumer) GetStream(ctx context.Context, stream *connect.BidiStre
 			continue
 		}
 
+		s.logger.Error("interceptor return error: %s \t correlationId: %d", err.Error(), msg.CorrelationId)
 		var response *gen.Response
 		var rateLimitError *collectorDomain.RateLimitError
 		if errors.As(err, &rateLimitError) {
@@ -128,7 +132,7 @@ func (s *StreamConsumer) GetStream(ctx context.Context, stream *connect.BidiStre
 
 		response.CorrelationId = msg.CorrelationId
 		if err := stream.Send(response); err != nil {
-			return err
+			return fmt.Errorf("error sending response: %w", err)
 		}
 	}
 }
