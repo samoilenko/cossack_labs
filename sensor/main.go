@@ -38,27 +38,15 @@ func endWithError(err error) {
 func main() {
 	ctx, finish := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer finish()
-	rawSensorName := flag.String("name", "", " sensor name")
-	rawSinkAddress := flag.String("address", "", " address of the telemetry sink")
-	rawRate := flag.Int("rate", 0, "number of messages per second to send, greater than 0")
 
-	flag.Parse()
+	wg := &sync.WaitGroup{}
 
-	address, err := sensorDomain.NewAddress(*rawSinkAddress)
+	address, sensorName, rate, err := sensorInfrastructure.GetConfigParameters()
 	if err != nil {
 		endWithError(err)
 	}
 
-	rate, err := sensorDomain.NewRate(*rawRate)
-	if err != nil {
-		endWithError(err)
-	}
-
-	sensorName, err := sensorDomain.NewSensorName(*rawSensorName)
-	if err != nil {
-		endWithError(err)
-	}
-
+	// create instances
 	stdlibLogger := log.New(os.Stdout, "", log.LstdFlags)
 	logger := sensorDomain.NewStdLogger(stdlibLogger)
 
@@ -76,8 +64,6 @@ func main() {
 		connect.WithGRPC(),
 	)
 
-	wg := &sync.WaitGroup{}
-
 	transport := sensorInfrastructure.NewGrpcStreamSender(client, logger)
 	wg.Add(1)
 	go func() {
@@ -88,6 +74,9 @@ func main() {
 	reader := sensorDomain.NewValueReader(rate, 2, logger)
 	valuesCh := reader.Read(ctx, sensorInfrastructure.DummySensor{})
 	sender := sensorDomain.NewSensorDataSender(transport, logger, sensorName)
+
+	// Starts read data from a sensor and sends to a consumer
 	sender.Send(ctx, valuesCh)
+
 	wg.Wait()
 }
