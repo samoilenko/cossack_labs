@@ -1,0 +1,48 @@
+services:
+  sensor1:
+    container_name: sensor-test-1
+    env_file:
+      - .env
+    environment:
+      - SENSOR_COLLECTOR_ADDRESS=water-bath
+      - SENSOR_COLLECTOR_ADDRESS=${SENSOR_COLLECTOR_ADDRESS}
+      - SENSOR_RATE=${SENSOR_RATE}
+    build:
+      dockerfile: ./docker/sensor/Dockerfile
+      context: .
+    volumes:
+      - ./app:/app:rw,delegated
+    networks:
+      - cossack_lab_network
+
+  sensor2:
+    container_name: sensor-test-2
+    env_file:
+      - .env
+    environment:
+      - SENSOR_COLLECTOR_ADDRESS=door-sensor
+      - SENSOR_COLLECTOR_ADDRESS=${SENSOR_COLLECTOR_ADDRESS}
+      - SENSOR_RATE=${SENSOR_RATE}
+    build:
+      dockerfile: ./docker/sensor/Dockerfile
+      context: .
+    volumes:
+      - ./app:/app:rw,delegated
+    networks:
+      - cossack_lab_network
+
+  collector:
+    container_name: sensor-collector
+    env_file:
+      - .env
+    build:
+      dockerfile: ./docker/collector/Dockerfile
+      context: .
+    volumes:
+      - ./app:/app:rw,delegated
+    networks:
+      - cossack_lab_network
+
+networks:
+  cossack_lab_network:
+    driver: bridge
