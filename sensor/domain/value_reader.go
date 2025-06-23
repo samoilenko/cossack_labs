@@ -21,14 +21,13 @@ type SensorValue struct {
 // ValueReader reads values from a sensor in a given time period
 type ValueReader struct {
 	logger      Logger
+	interval    time.Duration
 	maxCapacity uint32
-	rate        Rate
 }
 
 func (v *ValueReader) Read(ctx context.Context, sensor Sensor) <-chan *SensorValue {
 	valueCH := make(chan *SensorValue, v.maxCapacity)
-	delay := time.Second / time.Duration(v.rate)
-	ticker := time.NewTicker(delay)
+	ticker := time.NewTicker(v.interval)
 
 	go func() {
 		for {
@@ -55,10 +54,10 @@ func (v *ValueReader) Read(ctx context.Context, sensor Sensor) <-chan *SensorVal
 }
 
 // NewValueReader creates a ValueReader with the given rate and buffer size
-func NewValueReader(rate Rate, maxCapacity uint32, logger Logger) *ValueReader {
+func NewValueReader(interval time.Duration, maxCapacity uint32, logger Logger) *ValueReader {
 	return &ValueReader{
 		logger:      logger,
-		rate:        rate,
+		interval:    interval,
 		maxCapacity: maxCapacity,
 	}
 }

@@ -21,6 +21,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"connectrpc.com/connect"
 	sensorConnect "github.com/samoilenko/cossack_labs/pkg/sensorpb/v1/sensorpbv1connect"
@@ -81,7 +82,8 @@ func main() {
 		logger.Info("stream closed")
 	}()
 
-	reader := sensorDomain.NewValueReader(rate, 2, logger)
+	interval := time.Second / time.Duration(rate)
+	reader := sensorDomain.NewValueReader(interval, 2, logger)
 	valuesCh := reader.Read(ctx, sensorInfrastructure.DummySensor{})
 	sender := sensorDomain.NewSensorDataSender(transport, logger, sensorName)
 
