@@ -24,8 +24,7 @@ type SensorDataSender struct {
 // The method blocks until the context is cancelled or the input channel is closed.
 func (s *SensorDataSender) Send(ctx context.Context, values <-chan *SensorValue) {
 	for v := range values {
-		// TODO: add timeout
-		err := s.transport.Send(ctx, v.Value, v.Timestamp, s.sensorName)
+		err := s.sendWithTimeout(ctx, v)
 		if err == nil {
 			continue
 		}
@@ -53,6 +52,12 @@ func (s *SensorDataSender) Send(ctx context.Context, values <-chan *SensorValue)
 			s.logger.Error("error sending data: %s", err.Error())
 		}
 	}
+}
+
+func (s *SensorDataSender) sendWithTimeout(ctx context.Context, data *SensorValue) error {
+	sendContext, cancel := context.WithTimeout(ctx, time.Second*3)
+	defer cancel()
+	return s.transport.Send(sendContext, data.Value, data.Timestamp, s.sensorName)
 }
 
 // NewSensorDataSender creates a new SensorDataSender with the specified transport, logger, and sensor name.
