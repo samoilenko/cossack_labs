@@ -5,6 +5,12 @@ go 1.24.4
 tool github.com/mgechev/revive
 
 require (
+	connectrpc.com/connect v1.18.1
+	golang.org/x/net v0.40.0
+	google.golang.org/protobuf v1.36.6
+)
+
+require (
 	codeberg.org/chavacava/garif v0.2.0 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/fatih/color v1.18.0 // indirect
