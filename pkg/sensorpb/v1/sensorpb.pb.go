@@ -9,6 +9,8 @@ package sensorpbv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -80,7 +82,8 @@ type SensorData struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SensorName    string                 `protobuf:"bytes,1,opt,name=sensor_name,json=sensorName,proto3" json:"sensor_name,omitempty"`
 	SensorValue   int32                  `protobuf:"varint,2,opt,name=sensor_value,json=sensorValue,proto3" json:"sensor_value,omitempty"`
-	Timestamp     uint32                 `protobuf:"varint,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	CorrelationId int64                  `protobuf:"varint,4,opt,name=correlationId,proto3" json:"correlationId,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -129,9 +132,16 @@ func (x *SensorData) GetSensorValue() int32 {
 	return 0
 }
 
-func (x *SensorData) GetTimestamp() uint32 {
+func (x *SensorData) GetTimestamp() *timestamppb.Timestamp {
 	if x != nil {
 		return x.Timestamp
+	}
+	return nil
+}
+
+func (x *SensorData) GetCorrelationId() int64 {
+	if x != nil {
+		return x.CorrelationId
 	}
 	return 0
 }
@@ -140,7 +150,8 @@ type Response struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Code          Codes                  `protobuf:"varint,1,opt,name=code,proto3,enum=sensorpb.v1.Codes" json:"code,omitempty"`
 	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	RetryAfter    uint32                 `protobuf:"varint,3,opt,name=retry_after,json=retryAfter,proto3" json:"retry_after,omitempty"`
+	RetryAfter    *durationpb.Duration   `protobuf:"bytes,3,opt,name=retry_after,json=retryAfter,proto3" json:"retry_after,omitempty"`
+	CorrelationId int64                  `protobuf:"varint,4,opt,name=correlationId,proto3" json:"correlationId,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -189,9 +200,16 @@ func (x *Response) GetMessage() string {
 	return ""
 }
 
-func (x *Response) GetRetryAfter() uint32 {
+func (x *Response) GetRetryAfter() *durationpb.Duration {
 	if x != nil {
 		return x.RetryAfter
+	}
+	return nil
+}
+
+func (x *Response) GetCorrelationId() int64 {
+	if x != nil {
+		return x.CorrelationId
 	}
 	return 0
 }
@@ -200,18 +218,20 @@ var File_sensorpb_v1_sensorpb_proto protoreflect.FileDescriptor
 
 const file_sensorpb_v1_sensorpb_proto_rawDesc = "" +
 	"\n" +
-	"\x1asensorpb/v1/sensorpb.proto\x12\vsensorpb.v1\"n\n" +
+	"\x1asensorpb/v1/sensorpb.proto\x12\vsensorpb.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/duration.proto\"\xb0\x01\n" +
 	"\n" +
 	"SensorData\x12\x1f\n" +
 	"\vsensor_name\x18\x01 \x01(\tR\n" +
 	"sensorName\x12!\n" +
-	"\fsensor_value\x18\x02 \x01(\x05R\vsensorValue\x12\x1c\n" +
-	"\ttimestamp\x18\x03 \x01(\rR\ttimestamp\"m\n" +
+	"\fsensor_value\x18\x02 \x01(\x05R\vsensorValue\x128\n" +
+	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12$\n" +
+	"\rcorrelationId\x18\x04 \x01(\x03R\rcorrelationId\"\xae\x01\n" +
 	"\bResponse\x12&\n" +
 	"\x04code\x18\x01 \x01(\x0e2\x12.sensorpb.v1.CodesR\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1f\n" +
-	"\vretry_after\x18\x03 \x01(\rR\n" +
-	"retryAfter*u\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12:\n" +
+	"\vretry_after\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\n" +
+	"retryAfter\x12$\n" +
+	"\rcorrelationId\x18\x04 \x01(\x03R\rcorrelationId*u\n" +
 	"\x05Codes\x12\x14\n" +
 	"\x10CODE_UNSPECIFIED\x10\x00\x12\v\n" +
 	"\aCODE_OK\x10\x01\x12\x19\n" +
@@ -236,19 +256,23 @@ func file_sensorpb_v1_sensorpb_proto_rawDescGZIP() []byte {
 var file_sensorpb_v1_sensorpb_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_sensorpb_v1_sensorpb_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_sensorpb_v1_sensorpb_proto_goTypes = []any{
-	(Codes)(0),         // 0: sensorpb.v1.Codes
-	(*SensorData)(nil), // 1: sensorpb.v1.SensorData
-	(*Response)(nil),   // 2: sensorpb.v1.Response
+	(Codes)(0),                    // 0: sensorpb.v1.Codes
+	(*SensorData)(nil),            // 1: sensorpb.v1.SensorData
+	(*Response)(nil),              // 2: sensorpb.v1.Response
+	(*timestamppb.Timestamp)(nil), // 3: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),   // 4: google.protobuf.Duration
 }
 var file_sensorpb_v1_sensorpb_proto_depIdxs = []int32{
-	0, // 0: sensorpb.v1.Response.code:type_name -> sensorpb.v1.Codes
-	1, // 1: sensorpb.v1.SensorService.GetStream:input_type -> sensorpb.v1.SensorData
-	2, // 2: sensorpb.v1.SensorService.GetStream:output_type -> sensorpb.v1.Response
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	3, // 0: sensorpb.v1.SensorData.timestamp:type_name -> google.protobuf.Timestamp
+	0, // 1: sensorpb.v1.Response.code:type_name -> sensorpb.v1.Codes
+	4, // 2: sensorpb.v1.Response.retry_after:type_name -> google.protobuf.Duration
+	1, // 3: sensorpb.v1.SensorService.GetStream:input_type -> sensorpb.v1.SensorData
+	2, // 4: sensorpb.v1.SensorService.GetStream:output_type -> sensorpb.v1.Response
+	4, // [4:5] is the sub-list for method output_type
+	3, // [3:4] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_sensorpb_v1_sensorpb_proto_init() }
