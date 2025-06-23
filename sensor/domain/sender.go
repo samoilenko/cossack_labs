@@ -40,12 +40,17 @@ func (s *SensorDataSender) Send(ctx context.Context, values <-chan *SensorValue)
 				s.logger.Info("delay is finished")
 			}
 		} else if errors.Is(err, ErrTransportNotReady) {
+			s.logger.Error("get transport error: %s", err.Error())
+			delay := time.Second * 1
+			s.logger.Info("transport is not ready, waiting for %s", delay)
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(time.Second * 1):
-				s.logger.Info("transport is not ready")
+			case <-time.After(delay):
+
 			}
+		} else {
+			s.logger.Error("error sending data: %s", err.Error())
 		}
 	}
 }
