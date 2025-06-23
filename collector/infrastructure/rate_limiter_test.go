@@ -27,7 +27,7 @@ func createTestMessage(dataSize int) *anypb.Any {
 
 func TestNewRateLimiter(t *testing.T) {
 	maxLimit := collectorDomain.RateLimit(1000)
-	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit)
+	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit, 1*time.Second)
 
 	if rateLimiter == nil {
 		t.Fatal("NewRateLimiter returned nil")
@@ -48,7 +48,7 @@ func TestNewRateLimiter(t *testing.T) {
 
 func TestRateLimiter_Apply_FirstMessage(t *testing.T) {
 	maxLimit := collectorDomain.RateLimit(1000)
-	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit)
+	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit, 1*time.Second)
 
 	msg := createTestMessage(100)
 	err := rateLimiter.Apply(msg)
@@ -69,7 +69,7 @@ func TestRateLimiter_Apply_FirstMessage(t *testing.T) {
 
 func TestRateLimiter_Apply_WithinTimeWindow_UnderLimit(t *testing.T) {
 	maxLimit := collectorDomain.RateLimit(1000)
-	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit)
+	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit, 1*time.Second)
 
 	// First message
 	msg1 := createTestMessage(300)
@@ -93,7 +93,7 @@ func TestRateLimiter_Apply_WithinTimeWindow_UnderLimit(t *testing.T) {
 
 func TestRateLimiter_Apply_WithinTimeWindow_OverLimit(t *testing.T) {
 	maxLimit := collectorDomain.RateLimit(500)
-	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit)
+	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit, 1*time.Second)
 
 	// First message
 	msg1 := createTestMessage(300)
@@ -121,7 +121,7 @@ func TestRateLimiter_Apply_WithinTimeWindow_OverLimit(t *testing.T) {
 
 func TestRateLimiter_Apply_AfterTimeWindow_Reset(t *testing.T) {
 	maxLimit := collectorDomain.RateLimit(500)
-	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit)
+	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit, 1*time.Second)
 
 	// First message
 	msg1 := createTestMessage(400)
@@ -149,7 +149,7 @@ func TestRateLimiter_Apply_AfterTimeWindow_Reset(t *testing.T) {
 
 func TestRateLimiter_Apply_ExactlyAtLimit(t *testing.T) {
 	maxLimit := collectorDomain.RateLimit(674)
-	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit)
+	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit, 1*time.Second)
 
 	// First message
 	msg1 := createTestMessage(300)
@@ -175,7 +175,7 @@ func TestRateLimiter_Apply_ExactlyAtLimit(t *testing.T) {
 
 func TestRateLimiter_Apply_ConcurrentAccess(t *testing.T) {
 	maxLimit := collectorDomain.RateLimit(1000)
-	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit)
+	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit, 1*time.Second)
 
 	// Create context with timeout to detect deadlocks
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -215,7 +215,7 @@ func TestRateLimiter_Apply_ConcurrentAccess(t *testing.T) {
 
 func TestRateLimiter_Apply_ZeroSizeMessage(t *testing.T) {
 	maxLimit := collectorDomain.RateLimit(1000)
-	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit)
+	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit, 1*time.Second)
 
 	msg := createTestMessage(0)
 	err := rateLimiter.Apply(msg)
@@ -233,7 +233,7 @@ func TestRateLimiter_Apply_ZeroSizeMessage(t *testing.T) {
 
 func TestRateLimiter_Apply_EdgeCaseTimeWindow(t *testing.T) {
 	maxLimit := collectorDomain.RateLimit(1000)
-	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit)
+	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit, 1*time.Second)
 
 	// First message
 	msg1 := createTestMessage(500)
@@ -261,7 +261,7 @@ func TestRateLimiter_Apply_EdgeCaseTimeWindow(t *testing.T) {
 
 func TestRateLimiter_Apply_RealWorldScenario(t *testing.T) {
 	maxLimit := collectorDomain.RateLimit(1000)
-	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit)
+	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit, 1*time.Second)
 
 	// Simulate a burst of messages
 	messages := []*anypb.Any{
@@ -297,7 +297,7 @@ func TestRateLimiter_Apply_RealWorldScenario(t *testing.T) {
 // Benchmark tests
 func BenchmarkRateLimiter_Apply(b *testing.B) {
 	maxLimit := collectorDomain.RateLimit(10000)
-	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit)
+	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit, 1*time.Second)
 	msg := createTestMessage(100)
 
 	b.ResetTimer()
@@ -308,7 +308,7 @@ func BenchmarkRateLimiter_Apply(b *testing.B) {
 
 func BenchmarkRateLimiter_Apply_Concurrent(b *testing.B) {
 	maxLimit := collectorDomain.RateLimit(10000)
-	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit)
+	rateLimiter := NewRateLimiter[*anypb.Any](maxLimit, 1*time.Second)
 	msg := createTestMessage(100)
 
 	b.ResetTimer()

@@ -22,7 +22,7 @@ func (m *mockSensor) GetValue() (int32, error) {
 func TestValueReader_Read(t *testing.T) {
 	t.Run("reads values from sensor at a given rate", func(t *testing.T) {
 		sensor := &mockSensor{value: 42}
-		reader := NewValueReader(Rate(10), 2, &mockLogger{})
+		reader := NewValueReader(time.Second/time.Duration(10), 2, &mockLogger{})
 
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond) // +- 5 reads per 500ms
 		defer cancel()
@@ -47,7 +47,7 @@ func TestValueReader_Read(t *testing.T) {
 
 	t.Run("stops reading when context is cancelled", func(t *testing.T) {
 		sensor := &mockSensor{value: 42}
-		reader := NewValueReader(Rate(1000), 2, &mockLogger{})
+		reader := NewValueReader(time.Second/time.Duration(1000), 2, &mockLogger{})
 
 		ctx, cancel := context.WithCancel(context.Background())
 		valueCh := reader.Read(ctx, sensor)
