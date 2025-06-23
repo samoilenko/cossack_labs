@@ -174,7 +174,7 @@ func (s *GrpcStreamSender) retryAfterDelayManager(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case value := <-s.retryAfterDelayCh:
-			s.retryAfterDelay.Set(value)
+			s.retryAfterDelay.Set(value) // TODO: it should be calculated as value + now
 			select {
 			case <-ctx.Done():
 				return
