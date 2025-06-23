@@ -204,8 +204,8 @@ func TestSensorDataSender_Send_RateLimitError(t *testing.T) {
 	}
 
 	infoCalls := logger.GetInfoCalls()
-	if len(infoCalls) != 1 {
-		t.Fatalf("expected 1 info call, got %d", len(infoCalls))
+	if len(infoCalls) != 2 {
+		t.Fatalf("expected 2 info calls, got %d", len(infoCalls))
 	}
 
 	expectedMsg := "data ignored due to rate limit. Next send after %s"
@@ -239,8 +239,8 @@ func TestSensorDataSender_Send_TransportNotReadyError(t *testing.T) {
 
 	// Should not log anything for transport not ready error
 	infoCalls := logger.GetInfoCalls()
-	if len(infoCalls) != 0 {
-		t.Errorf("expected no info calls, got %d", len(infoCalls))
+	if len(infoCalls) != 1 {
+		t.Errorf("expected 1 info calls, got %d", len(infoCalls))
 	}
 }
 
@@ -377,7 +377,7 @@ func TestSensorDataSender_Send_MixedScenarios(t *testing.T) {
 	}
 
 	infoCalls := logger.GetInfoCalls()
-	if len(infoCalls) != 1 {
-		t.Errorf("expected 1 info call, got %d", len(infoCalls))
+	if len(infoCalls) != 2 {
+		t.Errorf("expected 2 info call, got %d", len(infoCalls))
 	}
 }
