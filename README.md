@@ -23,9 +23,16 @@ COLLECTOR_LOG_FILE=./data.txt
 `docker composer up --build -d`
 
 ## Description
-Application implements two behaviors:
+**Application implements two behaviors:**
  - sensor emulator
  - data collector from a sensor
+
+**Bonus challenges**
+ - Support multiple sensors in the Telemetry sink. In this case, the rate limit should be
+calculated across all sensors.
+ - Use gRPC for interservice communication.
+ - Implement graceful shutdown - ensure the buffer is flushed and sockets are closed on
+SIGINT and SIGTERM. 
 
 All services responsible for I/O communication tries to establish connection if one looses.
 
@@ -86,3 +93,4 @@ This componen has the following services:
 
 ### Room for improvements
 - [ ] Add error channel
+- [ ] Use generic types in `sensor/infrastructure/grpc_stream.go`, `sensor/infrastructure/grpc_stream_sender.go`
