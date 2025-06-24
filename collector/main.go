@@ -8,7 +8,7 @@
 //	-log-file: path to the output log file
 //	-buffer-size: buffer size in bytes for file writing
 //	-flush-interval: how often to flush the buffer to disk
-//	-rate-limit: maximum number of messages per second to process
+//	-rate-limit: maximum number of bytes per second to process
 package main
 
 import (
