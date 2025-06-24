@@ -8,6 +8,7 @@ func BroadcastResponses[T any](sourceCh <-chan T, responseConsumers []chan<- T) 
 		for _, consumer := range responseConsumers {
 			select {
 			case consumer <- data:
+			// ignore slow consumers, we can neglect that some consumers do not receive all messages
 			default:
 			}
 		}
